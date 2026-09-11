@@ -16,12 +16,17 @@ function initializeOpportunityStorage(db, dataRoot) {
       deadline TEXT NOT NULL DEFAULT '',
       application_url TEXT NOT NULL DEFAULT '',
       image_path TEXT NOT NULL DEFAULT '',
+      missing_materials TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );
     CREATE INDEX IF NOT EXISTS idx_job_opportunities_priority
       ON job_opportunities(applied, deadline);
   `)
+  const columns = db.prepare('PRAGMA table_info(job_opportunities)').all()
+  if (!columns.some(column => column.name === 'missing_materials')) {
+    db.exec("ALTER TABLE job_opportunities ADD COLUMN missing_materials TEXT NOT NULL DEFAULT ''")
+  }
 }
 
 function mapOpportunity(row) {
@@ -32,6 +37,7 @@ function mapOpportunity(row) {
     deadline: row.deadline,
     applicationUrl: row.application_url,
     imagePath: row.image_path,
+    missingMaterials: row.missing_materials || '',
     hasImage: Boolean(row.image_path && fs.existsSync(row.image_path)),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -90,23 +96,41 @@ function registerOpportunityIpc({ ipcMain, db, dataRoot, getWindow }) {
     const company = String(input.company || '').trim()
     const applicationUrl = String(input.applicationUrl || '').trim()
     const deadline = String(input.deadline || '').trim()
+    const missingMaterials = String(input.missingMaterials || '').trim()
     if (!company) throw new Error('请填写公司名称')
     if (!deadline || !/^\d{4}-\d{2}-\d{2}$/.test(deadline)) throw new Error('请选择有效的截止日期')
     if (applicationUrl && !/^https?:\/\//i.test(applicationUrl)) throw new Error('投递链接需要以 http:// 或 https:// 开头')
     if (!applicationUrl && !input.imagePath) throw new Error('请填写投递链接或选择投递图片')
 
-    const id = crypto.randomUUID()
-    let managedImagePath = ''
-    if (input.imagePath) {
+    const existing = input.id ? db.prepare('SELECT * FROM job_opportunities WHERE id=?').get(input.id) : null
+    if (input.id && !existing) throw new Error('找不到需要编辑的岗位机会')
+    const id = existing?.id || crypto.randomUUID()
+    let managedImagePath = existing?.image_path || ''
+    const keepsExistingImage = Boolean(existing?.image_path && input.imagePath && path.resolve(existing.image_path) === path.resolve(input.imagePath))
+    if (input.imagePath && !keepsExistingImage) {
       const extension = ensureValidImage(input.imagePath)
-      managedImagePath = path.join(dataRoot, 'opportunity-images', `${id}${extension}`)
-      fs.copyFileSync(input.imagePath, managedImagePath)
+      const nextImagePath = path.join(dataRoot, 'opportunity-images', `${id}-${Date.now()}${extension}`)
+      fs.copyFileSync(input.imagePath, nextImagePath)
+      if (existing?.image_path) moveManagedImageToTrash(existing.image_path, dataRoot)
+      managedImagePath = nextImagePath
+    } else if (existing?.image_path && !input.imagePath) {
+      moveManagedImageToTrash(existing.image_path, dataRoot)
+      managedImagePath = ''
     }
 
     const now = new Date().toISOString()
-    db.prepare('INSERT INTO job_opportunities VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run(
-      id, company, input.applied ? 1 : 0, deadline, applicationUrl, managedImagePath, now, now,
-    )
+    if (existing) {
+      db.prepare(`UPDATE job_opportunities SET company=?, applied=?, deadline=?, application_url=?,
+        image_path=?, missing_materials=?, updated_at=? WHERE id=?`).run(
+        company, input.applied ? 1 : 0, deadline, applicationUrl, managedImagePath, missingMaterials, now, id,
+      )
+    } else {
+      db.prepare(`INSERT INTO job_opportunities
+        (id, company, applied, deadline, application_url, image_path, missing_materials, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        id, company, input.applied ? 1 : 0, deadline, applicationUrl, managedImagePath, missingMaterials, now, now,
+      )
+    }
     return listOpportunities(db)
   })
 

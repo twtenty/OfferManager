@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   AlertTriangle, CalendarDays, Check, Circle, ExternalLink, Image, Link as LinkIcon,
-  Plus, Trash2, Upload, X,
+  Pencil, Plus, Trash2, Upload, X,
 } from 'lucide-react'
 import type { JobOpportunity, JobOpportunityInput } from './types'
 
@@ -11,7 +11,7 @@ type Props = {
 }
 
 const emptyForm: JobOpportunityInput = {
-  company: '', applied: false, deadline: '', applicationUrl: '', imagePath: '',
+  company: '', applied: false, deadline: '', applicationUrl: '', imagePath: '', missingMaterials: '',
 }
 
 function deadlineInfo(deadline: string) {
@@ -52,9 +52,17 @@ export default function Opportunities({ addSignal, onToast }: Props) {
     return { pending: pending.length, urgent, expired }
   }, [items])
 
-  function openForm() {
-    setForm(emptyForm)
-    setImageName('')
+  function openForm(item?: JobOpportunity) {
+    setForm(item ? {
+      id: item.id,
+      company: item.company,
+      applied: item.applied,
+      deadline: item.deadline,
+      applicationUrl: item.applicationUrl,
+      imagePath: item.imagePath,
+      missingMaterials: item.missingMaterials,
+    } : emptyForm)
+    setImageName(item?.imagePath.split(/[\\/]/).at(-1) || '')
     setValidation('')
     setShowForm(true)
   }
@@ -84,7 +92,7 @@ export default function Opportunities({ addSignal, onToast }: Props) {
     try {
       setItems(await window.offerManager.saveOpportunity(form))
       closeForm()
-      onToast('岗位机会已添加')
+      onToast(form.id ? '岗位机会已更新' : '岗位机会已添加')
     } catch (error) {
       setValidation(error instanceof Error ? error.message : '保存失败')
     }
@@ -123,12 +131,12 @@ export default function Opportunities({ addSignal, onToast }: Props) {
     <section className="panel opportunity-panel">
       <div className="opportunity-toolbar">
         <div><h2>可投递公司</h2><p>未投递的岗位优先，同一状态下截止越近越靠前</p></div>
-        <button className="button primary" onClick={openForm}><Plus />添加岗位</button>
+        <button className="button primary" onClick={() => openForm()}><Plus />添加岗位</button>
       </div>
 
       {loading ? <div className="opportunity-loading">正在读取岗位机会…</div> : items.length ? (
         <div className="data-table-wrap"><table className="data-table opportunity-table">
-          <thead><tr><th>公司名称</th><th>是否投递</th><th>截止日期</th><th>投递资料</th><th>操作</th></tr></thead>
+          <thead><tr><th>公司名称</th><th>是否投递</th><th>截止日期</th><th>投递资料</th><th>缺失材料</th><th>操作</th></tr></thead>
           <tbody>{items.map(item => {
             const deadline = deadlineInfo(item.deadline)
             return <tr key={item.id} className={!item.applied && ['urgent', 'soon', 'expired'].includes(deadline.tone) ? 'priority-row' : ''}>
@@ -142,16 +150,17 @@ export default function Opportunities({ addSignal, onToast }: Props) {
                 {item.hasImage && <button onClick={() => showImage(item)}><Image />查看图片</button>}
                 {!item.applicationUrl && !item.hasImage && <span>资料不可用</span>}
               </div></td>
-              <td><button className="opportunity-delete" title="删除" onClick={() => remove(item)}><Trash2 /></button></td>
+              <td>{item.missingMaterials ? <div className="missing-materials" title={item.missingMaterials}>{item.missingMaterials}</div> : <span className="no-missing-materials">无</span>}</td>
+              <td><div className="opportunity-actions"><button className="opportunity-edit" title="编辑" onClick={() => openForm(item)}><Pencil /></button><button className="opportunity-delete" title="删除" onClick={() => remove(item)}><Trash2 /></button></div></td>
             </tr>
           })}</tbody>
         </table></div>
-      ) : <div className="opportunity-empty"><div><Plus /></div><h3>还没有待投岗位</h3><p>收集看到的公司和岗位，避免错过网申截止时间。</p><button className="button secondary" onClick={openForm}>添加第一个岗位</button></div>}
+      ) : <div className="opportunity-empty"><div><Plus /></div><h3>还没有待投岗位</h3><p>收集看到的公司和岗位，避免错过网申截止时间。</p><button className="button secondary" onClick={() => openForm()}>添加第一个岗位</button></div>}
     </section>
 
     {showForm && <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && closeForm()}>
       <div className="modal opportunity-modal">
-        <div className="modal-head"><div><h2>添加岗位机会</h2><p>这条记录不会进入现有投递流程</p></div><button className="close-button" onClick={closeForm}><X /></button></div>
+        <div className="modal-head"><div><h2>{form.id ? '编辑岗位机会' : '添加岗位机会'}</h2><p>这条记录不会进入现有投递流程</p></div><button className="close-button" onClick={closeForm}><X /></button></div>
         <form onSubmit={save}>
           <label className="field"><span>公司名称<em>*</em></span><input autoFocus required value={form.company} onChange={event => setForm(current => ({ ...current, company: event.target.value }))} placeholder="例如：字节跳动" /></label>
           <div className="form-grid">
@@ -162,11 +171,12 @@ export default function Opportunities({ addSignal, onToast }: Props) {
           <div className="resource-divider"><span>或者</span></div>
           <div className={`image-picker ${form.imagePath ? 'selected' : ''}`}>
             <div>{form.imagePath ? <Image /> : <Upload />}</div>
-            <section><strong>{imageName || '选择投递图片'}</strong><span>{form.imagePath ? '图片将在保存后复制到软件数据目录' : '支持 PNG、JPG、WEBP、GIF、BMP，最大 10 MB'}</span></section>
-            <button type="button" className="button ghost" onClick={chooseImage}>{form.imagePath ? '重新选择' : '选择图片'}</button>
+            <section><strong>{imageName || '选择投递图片'}</strong><span>{form.imagePath ? '保存时将保留或更新这张图片' : '支持 PNG、JPG、WEBP、GIF、BMP，最大 10 MB'}</span></section>
+            <div className="image-picker-actions">{form.imagePath && <button type="button" className="remove-image" onClick={() => { setForm(current => ({ ...current, imagePath: '' })); setImageName('') }}>移除</button>}<button type="button" className="button ghost" onClick={chooseImage}>{form.imagePath ? '替换' : '选择图片'}</button></div>
           </div>
+          <label className="field"><span>缺失材料</span><textarea rows={2} value={form.missingMaterials} onChange={event => setForm(current => ({ ...current, missingMaterials: event.target.value }))} placeholder="例如：成绩单、英语证书、作品集（选填）" /></label>
           {validation && <div className="form-validation"><AlertTriangle />{validation}</div>}
-          <div className="modal-footer"><button type="button" className="button ghost" onClick={closeForm}>取消</button><button type="submit" className="button primary">添加岗位</button></div>
+          <div className="modal-footer"><button type="button" className="button ghost" onClick={closeForm}>取消</button><button type="submit" className="button primary">{form.id ? '保存修改' : '添加岗位'}</button></div>
         </form>
       </div>
     </div>}

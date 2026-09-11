@@ -76,17 +76,20 @@ export type JobOpportunity = {
   deadline: string
   applicationUrl: string
   imagePath: string
+  missingMaterials: string
   hasImage: boolean
   createdAt: string
   updatedAt: string
 }
 
 export type JobOpportunityInput = {
+  id?: string
   company: string
   applied: boolean
   deadline: string
   applicationUrl: string
   imagePath: string
+  missingMaterials: string
 }
 
 export type OfferManagerApi = {

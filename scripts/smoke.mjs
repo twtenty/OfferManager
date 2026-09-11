@@ -39,16 +39,21 @@ if (title !== 'Offer Manager' || !Array.isArray(initial.applications) || !Array.
 }
 
 const opportunityCompany = '__OPPORTUNITY_SMOKE_TEST__'
+const staleOpportunities = await evaluate(`window.offerManager.listOpportunities()`)
+for (const stale of staleOpportunities.filter(item => item.company === opportunityCompany)) {
+  await evaluate(`window.offerManager.deleteOpportunity('${stale.id}')`)
+}
 const opportunities = await evaluate(`window.offerManager.saveOpportunity(${JSON.stringify({
   company: opportunityCompany, applied: false,
   deadline: new Date(Date.now() + 86_400_000).toISOString().slice(0, 10),
-  applicationUrl: 'https://example.com/jobs', imagePath: '',
+  applicationUrl: 'https://example.com/jobs', imagePath: '', missingMaterials: '成绩单、作品集',
 })})`)
 const opportunity = opportunities.find(item => item.company === opportunityCompany)
-if (!opportunity || opportunity.applied) throw new Error('无法创建独立岗位机会')
+if (!opportunity || opportunity.applied || opportunity.missingMaterials !== '成绩单、作品集') throw new Error('无法创建独立岗位机会')
+const editedOpportunities = await evaluate(`window.offerManager.saveOpportunity(${JSON.stringify({ ...opportunity, missingMaterials: '成绩单' })})`)
+if (editedOpportunities.filter(item => item.id === opportunity.id).length !== 1 || editedOpportunities.find(item => item.id === opportunity.id)?.missingMaterials !== '成绩单') throw new Error('无法编辑岗位机会')
 const toggledOpportunities = await evaluate(`window.offerManager.toggleOpportunityApplied(${JSON.stringify({ id: '__ID__', applied: true }).replace('__ID__', opportunity.id)})`)
 if (!toggledOpportunities.find(item => item.id === opportunity.id)?.applied) throw new Error('无法切换岗位投递状态')
-await evaluate(`window.offerManager.deleteOpportunity('${opportunity.id}')`)
 
 const stamp = new Date().toISOString()
 const created = await evaluate(`window.offerManager.saveApplication(${JSON.stringify({
@@ -76,8 +81,14 @@ await evaluate(`window.offerManager.deleteEvent('${interview.id}')`)
 await evaluate(`window.offerManager.deleteApplication('${application.id}')`)
 
 await evaluate(`[...document.querySelectorAll('button')].find(button => button.textContent.includes('待投岗位'))?.click()`)
-await new Promise(resolve => setTimeout(resolve, 150))
-if (!await evaluate(`document.body.innerText.includes('可投递公司')`)) throw new Error('待投岗位页面未正确显示')
+await new Promise(resolve => setTimeout(resolve, 800))
+if (!await evaluate(`document.body.innerText.includes('可投递公司') && document.body.innerText.includes('缺失材料')`)) throw new Error('待投岗位页面未正确显示')
+if (!await evaluate(`[...document.querySelectorAll('button[title="编辑"]')].some(button => button.closest('tr')?.innerText.includes('${opportunityCompany}'))`)) throw new Error('岗位编辑按钮未正确显示')
+await evaluate(`[...document.querySelectorAll('button[title="编辑"]')].find(button => button.closest('tr')?.innerText.includes('${opportunityCompany}'))?.click()`)
+await new Promise(resolve => setTimeout(resolve, 200))
+if (!await evaluate(`document.body.innerText.includes('编辑岗位机会')`)) throw new Error('岗位编辑入口未正确显示')
+await evaluate(`document.querySelector('.opportunity-modal .close-button')?.click()`)
+await evaluate(`window.offerManager.deleteOpportunity('${opportunity.id}')`)
 
-console.log('Smoke test passed: pages, SQLite CRUD, opportunities, schedule and Markdown review are working.')
+console.log('Smoke test passed: pages, SQLite CRUD, opportunity editing, schedule and Markdown review are working.')
 socket.close()
