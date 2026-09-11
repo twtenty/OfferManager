@@ -12,14 +12,17 @@ let dataRoot
 const DEFAULT_STAGES = [
   ['准备投递', '#8a8a80', 0, 1],
   ['已投递', '#5975a4', 1, 1],
-  ['简历筛选', '#8b6fb0', 2, 1],
-  ['笔试', '#c0823f', 3, 1],
-  ['一面', '#cf6b4f', 4, 1],
-  ['二面', '#d44f5f', 5, 1],
-  ['HR面', '#b33f80', 6, 1],
-  ['Offer', '#3c8c6b', 7, 0],
-  ['拒绝', '#8f5555', 8, 0],
-  ['放弃', '#797971', 9, 0],
+  ['测评', '#6f83b5', 2, 1],
+  ['简历筛选', '#8b6fb0', 3, 1],
+  ['笔试', '#c0823f', 4, 1],
+  ['AI面', '#c96f48', 5, 1],
+  ['一面', '#cf6b4f', 6, 1],
+  ['二面', '#d44f5f', 7, 1],
+  ['三面', '#c0446a', 8, 1],
+  ['HR面', '#b33f80', 9, 1],
+  ['Offer', '#3c8c6b', 10, 0],
+  ['拒绝', '#8f5555', 11, 0],
+  ['放弃', '#797971', 12, 0],
 ]
 
 function ensureDatabase() {
@@ -88,11 +91,9 @@ function ensureDatabase() {
   `)
   initializeOpportunityStorage(db, dataRoot)
 
-  const stageCount = db.prepare('SELECT COUNT(*) AS count FROM stages').get().count
-  if (!stageCount) {
-    const insert = db.prepare('INSERT INTO stages (name, color, sort_order, active) VALUES (?, ?, ?, ?)')
-    for (const stage of DEFAULT_STAGES) insert.run(...stage)
-  }
+  const upsertStage = db.prepare(`INSERT INTO stages (name, color, sort_order, active) VALUES (?, ?, ?, ?)
+    ON CONFLICT(name) DO UPDATE SET sort_order=excluded.sort_order, active=excluded.active`)
+  for (const stage of DEFAULT_STAGES) upsertStage.run(...stage)
   createAutomaticBackup(dbPath)
 }
 

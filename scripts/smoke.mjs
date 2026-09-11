@@ -37,6 +37,8 @@ const initial = await evaluate('window.offerManager.getSnapshot()')
 if (title !== 'Offer Manager' || !Array.isArray(initial.applications) || !Array.isArray(initial.events)) {
   throw new Error('应用未正确加载')
 }
+const expectedStages = ['准备投递', '已投递', '测评', '简历筛选', '笔试', 'AI面', '一面', '二面', '三面', 'HR面', 'Offer', '拒绝', '放弃']
+if (expectedStages.some((stage, index) => initial.stages[index]?.name !== stage)) throw new Error('招聘流程阶段或顺序不正确')
 
 const opportunityCompany = '__OPPORTUNITY_SMOKE_TEST__'
 const staleOpportunities = await evaluate(`window.offerManager.listOpportunities()`)
