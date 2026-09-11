@@ -1,21 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import {
-  Activity, AlertCircle, ArrowRight, BriefcaseBusiness, Building2, CalendarClock,
+  Activity, AlertCircle, ArrowRight, BriefcaseBusiness, Building2, CalendarClock, ClipboardList,
   CalendarDays, Check, ChevronRight, Clock3, Columns3, Download, ExternalLink,
   FileText, FolderOpen, Inbox, LayoutDashboard, Link as LinkIcon, MapPin, MoreHorizontal,
   PenLine, Plus, Save, Search, Trash2, Trophy, X,
 } from 'lucide-react'
 import type { Application, ApplicationInput, EventInput, InterviewEvent, Review, ReviewDocument, Snapshot, Stage } from './types'
 import { dateTime, fullDateTime, relativeTime, shortDate, toInputDate, toInputDateTime } from './utils'
+import Opportunities from './Opportunities'
 
-type View = 'dashboard' | 'applications' | 'kanban' | 'schedule'
+type View = 'dashboard' | 'applications' | 'opportunities' | 'kanban' | 'schedule'
 
 const EMPTY: Snapshot = { applications: [], events: [], reviews: [], stages: [], history: [], dataRoot: '' }
 
 const viewMeta: Record<View, { title: string; subtitle: string }> = {
   dashboard: { title: '投递概览', subtitle: '把握每一个正在发生的机会' },
   applications: { title: '投递记录', subtitle: '集中查看和管理所有申请' },
+  opportunities: { title: '待投岗位', subtitle: '收集值得投递的公司，不错过截止日期' },
   kanban: { title: '招聘流程', subtitle: '拖动卡片即可更新进度' },
   schedule: { title: '面试日程', subtitle: '近期安排按时间由近到远展示' },
 }
@@ -29,6 +31,7 @@ function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [reviewDocument, setReviewDocument] = useState<ReviewDocument | null>(null)
   const [toast, setToast] = useState<string>('')
+  const [opportunityAddSignal, setOpportunityAddSignal] = useState(0)
 
   useEffect(() => {
     window.offerManager.getSnapshot().then(setSnapshot).catch(error => setToast(error.message)).finally(() => setLoading(false))
@@ -79,6 +82,7 @@ function App() {
         <nav>
           <NavItem icon={<LayoutDashboard />} label="投递概览" active={view === 'dashboard'} onClick={() => setView('dashboard')} />
           <NavItem icon={<BriefcaseBusiness />} label="投递记录" active={view === 'applications'} onClick={() => setView('applications')} count={snapshot.applications.length} />
+          <NavItem icon={<ClipboardList />} label="待投岗位" active={view === 'opportunities'} onClick={() => setView('opportunities')} />
           <NavItem icon={<Columns3 />} label="招聘流程" active={view === 'kanban'} onClick={() => setView('kanban')} />
           <NavItem icon={<CalendarDays />} label="面试日程" active={view === 'schedule'} onClick={() => setView('schedule')} />
         </nav>
@@ -96,7 +100,7 @@ function App() {
       <main className="main-content">
         <header className="topbar">
           <div><h1>{meta.title}</h1><p>{meta.subtitle}</p></div>
-          <button className="button primary" onClick={() => setApplicationForm('new')}><Plus /> 新建投递</button>
+          <button className="button primary" onClick={() => view === 'opportunities' ? setOpportunityAddSignal(value => value + 1) : setApplicationForm('new')}><Plus /> {view === 'opportunities' ? '添加岗位' : '新建投递'}</button>
         </header>
 
         <div className="page-body">
@@ -104,6 +108,8 @@ function App() {
             <Dashboard snapshot={snapshot} onSelect={setSelectedId} onAdd={() => setApplicationForm('new')} onGoSchedule={() => setView('schedule')} />
           ) : view === 'applications' ? (
             <Applications snapshot={snapshot} onSelect={setSelectedId} onEdit={setApplicationForm} onAdd={() => setApplicationForm('new')} onCreateReview={createReview} />
+          ) : view === 'opportunities' ? (
+            <Opportunities addSignal={opportunityAddSignal} onToast={setToast} />
           ) : view === 'kanban' ? (
             <Kanban snapshot={snapshot} onSelect={setSelectedId} onStatus={(id, status) => perform(() => window.offerManager.updateApplicationStatus({ id, status }), `已移动到「${status}」`)} />
           ) : (

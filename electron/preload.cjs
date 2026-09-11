@@ -16,4 +16,11 @@ contextBridge.exposeInMainWorld('offerManager', {
   openUrl: url => ipcRenderer.invoke('system:openUrl', url),
   showDataFolder: () => ipcRenderer.invoke('system:showData'),
   exportCsv: () => ipcRenderer.invoke('data:exportCsv'),
+  listOpportunities: () => ipcRenderer.invoke('opportunity:list'),
+  chooseOpportunityImage: () => ipcRenderer.invoke('opportunity:chooseImage'),
+  saveOpportunity: input => ipcRenderer.invoke('opportunity:save', input),
+  toggleOpportunityApplied: input => ipcRenderer.invoke('opportunity:toggleApplied', input),
+  deleteOpportunity: id => ipcRenderer.invoke('opportunity:delete', id),
+  openOpportunityImage: id => ipcRenderer.invoke('opportunity:openImage', id),
+  readOpportunityImage: id => ipcRenderer.invoke('opportunity:readImage', id),
 })

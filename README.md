@@ -56,6 +56,8 @@ npm start
 
 - 投递概览与状态统计
 - 投递记录的新建、编辑、搜索和筛选
+- 独立的待投岗位清单，按未投递和临近截止日期优先排序
+- 岗位投递链接、投递图片及投递状态管理
 - 可拖拽的招聘流程看板
 - 笔试、面试日程管理，并按临近时间排序
 - 每轮面试独立的 Markdown 复盘
@@ -88,6 +90,7 @@ Windows 默认保存到：
 %APPDATA%/offer-manager/OfferManagerData/
 ├── offer-manager.db
 ├── backups/
+├── opportunity-images/
 └── reviews/
 ```
 
@@ -98,6 +101,7 @@ Windows 默认保存到：
 ```text
 electron/
   main.cjs       # SQLite、文件系统和桌面窗口
+  opportunities.cjs # 独立的待投岗位数据与图片管理
   preload.cjs    # 安全的前后端接口
 src/
   App.tsx        # 页面和交互

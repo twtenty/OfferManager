@@ -69,6 +69,26 @@ export type EventInput = Omit<InterviewEvent, 'id' | 'createdAt'> & { id?: strin
 
 export type ReviewDocument = { review: Review; content: string }
 
+export type JobOpportunity = {
+  id: string
+  company: string
+  applied: boolean
+  deadline: string
+  applicationUrl: string
+  imagePath: string
+  hasImage: boolean
+  createdAt: string
+  updatedAt: string
+}
+
+export type JobOpportunityInput = {
+  company: string
+  applied: boolean
+  deadline: string
+  applicationUrl: string
+  imagePath: string
+}
+
 export type OfferManagerApi = {
   getSnapshot: () => Promise<Snapshot>
   saveApplication: (input: ApplicationInput) => Promise<Snapshot>
@@ -85,6 +105,13 @@ export type OfferManagerApi = {
   openUrl: (url: string) => Promise<void>
   showDataFolder: () => Promise<string>
   exportCsv: () => Promise<boolean>
+  listOpportunities: () => Promise<JobOpportunity[]>
+  chooseOpportunityImage: () => Promise<{ filePath: string; fileName: string } | null>
+  saveOpportunity: (input: JobOpportunityInput) => Promise<JobOpportunity[]>
+  toggleOpportunityApplied: (input: { id: string; applied: boolean }) => Promise<JobOpportunity[]>
+  deleteOpportunity: (id: string) => Promise<JobOpportunity[]>
+  openOpportunityImage: (id: string) => Promise<boolean>
+  readOpportunityImage: (id: string) => Promise<string>
 }
 
 declare global {

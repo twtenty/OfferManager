@@ -3,6 +3,7 @@ const { DatabaseSync } = require('node:sqlite')
 const path = require('node:path')
 const fs = require('node:fs')
 const crypto = require('node:crypto')
+const { initializeOpportunityStorage, registerOpportunityIpc } = require('./opportunities.cjs')
 
 let mainWindow
 let db
@@ -85,6 +86,7 @@ function ensureDatabase() {
     CREATE INDEX IF NOT EXISTS idx_events_starts ON events(starts_at);
     CREATE INDEX IF NOT EXISTS idx_reviews_application ON reviews(application_id);
   `)
+  initializeOpportunityStorage(db, dataRoot)
 
   const stageCount = db.prepare('SELECT COUNT(*) AS count FROM stages').get().count
   if (!stageCount) {
@@ -303,6 +305,8 @@ function registerIpc() {
     fs.writeFileSync(result.filePath, `\uFEFF${csv}`, 'utf8')
     return true
   })
+
+  registerOpportunityIpc({ ipcMain, db, dataRoot, getWindow: () => mainWindow })
 }
 
 function createWindow() {
