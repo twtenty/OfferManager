@@ -25,6 +25,7 @@ export type InterviewEvent = {
   contact: string
   status: string
   reminderMinutes: number
+  timeMode: 'scheduled' | 'deadline'
   createdAt: string
 }
 

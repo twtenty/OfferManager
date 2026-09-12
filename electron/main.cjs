@@ -74,6 +74,7 @@ function ensureDatabase() {
       contact TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT '待进行',
       reminder_minutes INTEGER NOT NULL DEFAULT 30,
+      time_mode TEXT NOT NULL DEFAULT 'scheduled',
       created_at TEXT NOT NULL
     );
     CREATE TABLE IF NOT EXISTS reviews (
@@ -89,6 +90,10 @@ function ensureDatabase() {
     CREATE INDEX IF NOT EXISTS idx_events_starts ON events(starts_at);
     CREATE INDEX IF NOT EXISTS idx_reviews_application ON reviews(application_id);
   `)
+  const eventColumns = db.prepare('PRAGMA table_info(events)').all()
+  if (!eventColumns.some(column => column.name === 'time_mode')) {
+    db.exec("ALTER TABLE events ADD COLUMN time_mode TEXT NOT NULL DEFAULT 'scheduled'")
+  }
   initializeOpportunityStorage(db, dataRoot)
 
   const upsertStage = db.prepare(`INSERT INTO stages (name, color, sort_order, active) VALUES (?, ?, ?, ?)
@@ -119,7 +124,8 @@ function mapEvent(row) {
     id: row.id, applicationId: row.application_id, title: row.title,
     eventType: row.event_type, startsAt: row.starts_at, duration: row.duration,
     location: row.location, meetingUrl: row.meeting_url, contact: row.contact,
-    status: row.status, reminderMinutes: row.reminder_minutes, createdAt: row.created_at,
+    status: row.status, reminderMinutes: row.reminder_minutes,
+    timeMode: row.time_mode || 'scheduled', createdAt: row.created_at,
   }
 }
 
@@ -188,16 +194,19 @@ function registerIpc() {
     const now = new Date().toISOString()
     if (input.id && db.prepare('SELECT id FROM events WHERE id=?').get(input.id)) {
       db.prepare(`UPDATE events SET application_id=?, title=?, event_type=?, starts_at=?, duration=?,
-        location=?, meeting_url=?, contact=?, status=?, reminder_minutes=? WHERE id=?`).run(
+        location=?, meeting_url=?, contact=?, status=?, reminder_minutes=?, time_mode=? WHERE id=?`).run(
         input.applicationId, input.title, input.eventType, input.startsAt, Number(input.duration) || 60,
         input.location || '', input.meetingUrl || '', input.contact || '', input.status || '待进行',
-        Number(input.reminderMinutes) || 30, id,
+        Number(input.reminderMinutes) || 30, input.timeMode || 'scheduled', id,
       )
     } else {
-      db.prepare('INSERT INTO events VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(
+      db.prepare(`INSERT INTO events
+        (id, application_id, title, event_type, starts_at, duration, location, meeting_url,
+          contact, status, reminder_minutes, time_mode, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
         id, input.applicationId, input.title, input.eventType, input.startsAt, Number(input.duration) || 60,
         input.location || '', input.meetingUrl || '', input.contact || '', input.status || '待进行',
-        Number(input.reminderMinutes) || 30, now,
+        Number(input.reminderMinutes) || 30, input.timeMode || 'scheduled', now,
       )
     }
     return getSnapshot()
