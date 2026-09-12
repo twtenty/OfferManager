@@ -36,6 +36,16 @@ function eventTimeLabel(event: InterviewEvent) {
     : `${fullDateTime(event.startsAt)} · ${event.duration} 分钟`
 }
 
+function compareEventsByPriority(a: InterviewEvent, b: InterviewEvent) {
+  const aPending = a.status === '待进行'
+  const bPending = b.status === '待进行'
+  if (aPending !== bPending) return aPending ? -1 : 1
+
+  const aTime = new Date(a.startsAt).getTime()
+  const bTime = new Date(b.startsAt).getTime()
+  return aPending ? aTime - bTime : bTime - aTime
+}
+
 const viewMeta: Record<View, { title: string; subtitle: string }> = {
   dashboard: { title: '投递概览', subtitle: '把握每一个正在发生的机会' },
   applications: { title: '投递记录', subtitle: '集中查看和管理所有申请' },
@@ -341,7 +351,7 @@ function ApplicationDetail({ application, snapshot, onClose, onEdit, onAddEvent,
   application: Application; snapshot: Snapshot; onClose: () => void; onEdit: () => void; onAddEvent: () => void; onEditEvent: (event: InterviewEvent) => void
   onCreateReview: (applicationId: string, eventId?: string | null) => void; onOpenReview: (review: Review) => void; onRefresh: (data: Snapshot) => void; onToast: (message: string) => void; onDelete: () => void
 }) {
-  const events = snapshot.events.filter(event => event.applicationId === application.id).sort((a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime())
+  const events = snapshot.events.filter(event => event.applicationId === application.id).sort(compareEventsByPriority)
   const reviews = snapshot.reviews.filter(review => review.applicationId === application.id)
   const history = snapshot.history.filter(item => item.applicationId === application.id)
   const stage = snapshot.stages.find(stage => stage.name === application.status)
