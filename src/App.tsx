@@ -46,6 +46,16 @@ function compareEventsByPriority(a: InterviewEvent, b: InterviewEvent) {
   return aPending ? aTime - bTime : bTime - aTime
 }
 
+function eventStatusLabel(status: string) {
+  return status === '待进行' ? '进行中' : status
+}
+
+function eventStatusClass(status: string) {
+  if (status === '待进行') return 'active'
+  if (status === '已完成') return 'completed'
+  return 'cancelled'
+}
+
 const viewMeta: Record<View, { title: string; subtitle: string }> = {
   dashboard: { title: '投递概览', subtitle: '把握每一个正在发生的机会' },
   applications: { title: '投递记录', subtitle: '集中查看和管理所有申请' },
@@ -380,7 +390,7 @@ function ApplicationDetail({ application, snapshot, onClose, onEdit, onAddEvent,
           const review = reviews.find(review => review.eventId === event.id)
           return <article key={event.id} className="detail-event">
             <div className="event-type-icon"><CalendarClock /></div>
-            <div className="detail-event-main"><div><strong>{eventDisplayTitle(event, application)}</strong><span>{event.eventType}</span></div><p>{event.timeMode === 'deadline' ? <CalendarDays /> : <Clock3 />}{eventTimeLabel(event)}</p>{event.location && <p><MapPin />{event.location}</p>}
+            <div className="detail-event-main"><div><strong>{eventDisplayTitle(event, application)}</strong><div className="event-labels"><span className="event-kind">{event.eventType}</span><span className={`event-status-label ${eventStatusClass(event.status)}`}>{eventStatusLabel(event.status)}</span></div></div><p>{event.timeMode === 'deadline' ? <CalendarDays /> : <Clock3 />}{eventTimeLabel(event)}</p>{event.location && <p><MapPin />{event.location}</p>}
               <div className="event-actions">{event.meetingUrl && <button className="primary-event-link" onClick={() => window.offerManager.openUrl(event.meetingUrl)}><ExternalLink />{eventLinkLabel(event.eventType)}</button>}{review ? <button onClick={() => onOpenReview(review)}><FileText />编辑复盘</button> : <button onClick={() => onCreateReview(application.id, event.id)}><Plus />新建复盘</button>}<button onClick={() => onEditEvent(event)}>编辑日程</button></div>
             </div>
           </article>
