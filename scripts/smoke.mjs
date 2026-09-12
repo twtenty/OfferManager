@@ -66,13 +66,13 @@ const application = created.applications.find(item => item.company === '__SMOKE_
 if (!application) throw new Error('无法创建投递记录')
 
 const eventInput = {
-  applicationId: application.id, title: `自动测试日程 ${stamp}`, eventType: '一面',
+  applicationId: application.id, title: `自动测试日程 ${stamp}`, eventType: '在线测评',
   startsAt: new Date(Date.now() + 86_400_000).toISOString(), duration: 45, location: '线上',
-  meetingUrl: '', contact: '', status: '待进行', reminderMinutes: 30,
+  meetingUrl: 'https://example.com/assessment', contact: '', status: '待进行', reminderMinutes: 30,
 }
 const withEvent = await evaluate(`window.offerManager.saveEvent(${JSON.stringify(eventInput)})`)
 const interview = withEvent.events.find(item => item.applicationId === application.id)
-if (!interview) throw new Error('无法创建面试日程')
+if (!interview || interview.meetingUrl !== 'https://example.com/assessment') throw new Error('无法创建带独立链接的测评日程')
 
 const createdReview = await evaluate(`window.offerManager.createReview(${JSON.stringify({ applicationId: application.id, eventId: interview.id })})`)
 const review = await evaluate(`window.offerManager.readReview('${createdReview.review.id}')`)

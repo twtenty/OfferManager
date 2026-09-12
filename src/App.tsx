@@ -14,6 +14,20 @@ type View = 'dashboard' | 'applications' | 'opportunities' | 'kanban' | 'schedul
 
 const EMPTY: Snapshot = { applications: [], events: [], reviews: [], stages: [], history: [], dataRoot: '' }
 
+function eventDisplayTitle(event: Pick<InterviewEvent, 'title' | 'eventType'>, application?: Application) {
+  const company = application?.company || ''
+  const title = event.title.trim()
+  if (company && (title === `${company} 面试` || title === '面试')) return `${company} ${event.eventType}`
+  return event.title
+}
+
+function eventLinkLabel(eventType: string) {
+  if (eventType.includes('测评')) return '打开测评链接'
+  if (eventType.includes('笔试')) return '打开笔试链接'
+  if (eventType.includes('面') || eventType === '终面') return '加入面试'
+  return '打开日程链接'
+}
+
 const viewMeta: Record<View, { title: string; subtitle: string }> = {
   dashboard: { title: '投递概览', subtitle: '把握每一个正在发生的机会' },
   applications: { title: '投递记录', subtitle: '集中查看和管理所有申请' },
@@ -199,7 +213,7 @@ function Dashboard({ snapshot, onSelect, onAdd, onGoSchedule }: { snapshot: Snap
           const application = snapshot.applications.find(item => item.id === event.applicationId)
           return <button className="event-row" key={event.id} onClick={() => onSelect(event.applicationId)}>
             <div className="date-chip"><strong>{shortDate(event.startsAt).split('-').at(-1)}</strong><span>{new Intl.DateTimeFormat('zh-CN', { month: 'short' }).format(new Date(event.startsAt))}</span></div>
-            <div className="event-main"><strong>{event.title}</strong><span>{application?.company} · {application?.role}</span></div>
+            <div className="event-main"><strong>{eventDisplayTitle(event, application)}</strong><span>{application?.company} · {application?.role}</span></div>
             <div className="event-meta"><strong>{relativeTime(event.startsAt)}</strong><span><Clock3 />{dateTime(event.startsAt).split(' ')[1] || dateTime(event.startsAt)}</span></div>
             <ChevronRight />
           </button>
@@ -309,7 +323,7 @@ function Schedule({ snapshot, onSelect, onAdd }: { snapshot: Snapshot; onSelect:
         <div className="timeline-line">{index < events.length - 1 && <i />}</div>
         <div className="schedule-date"><strong>{dateTime(event.startsAt)}</strong><span>{relativeTime(event.startsAt)}</span></div>
         <div className="schedule-dot" />
-        <div className="schedule-card"><div><span className="eyebrow">{event.eventType}</span><h3>{event.title}</h3><p>{app?.company} · {app?.role}</p></div><div className="schedule-info">{event.location && <span><MapPin />{event.location}</span>}<span><Clock3 />{event.duration} 分钟</span>{review && <span className="review-ready"><FileText />已有复盘</span>}</div><ChevronRight /></div>
+        <div className="schedule-card"><div><span className="eyebrow">{event.eventType}</span><h3>{eventDisplayTitle(event, app)}</h3><p>{app?.company} · {app?.role}</p></div><div className="schedule-info">{event.location && <span><MapPin />{event.location}</span>}<span><Clock3 />{event.duration} 分钟</span>{event.meetingUrl && <span className="event-link-ready"><LinkIcon />包含日程链接</span>}{review && <span className="review-ready"><FileText />已有复盘</span>}</div><ChevronRight /></div>
       </button>
     })}</div> : <EmptyState icon={<CalendarDays />} title="没有待进行的日程" description="为投递添加笔试或面试，时间越近越靠前。" action="添加日程" onAction={onAdd} />}
   </section>
@@ -343,13 +357,13 @@ function ApplicationDetail({ application, snapshot, onClose, onEdit, onAddEvent,
       </section>}
 
       <section className="detail-section">
-        <div className="section-heading"><div><h3>面试与笔试</h3><span>{events.length} 个日程</span></div><button className="text-button" onClick={onAddEvent}><Plus />添加</button></div>
+        <div className="section-heading"><div><h3>测评与面试日程</h3><span>{events.length} 个日程</span></div><button className="text-button" onClick={onAddEvent}><Plus />添加</button></div>
         {events.length ? <div className="detail-events">{events.map(event => {
           const review = reviews.find(review => review.eventId === event.id)
           return <article key={event.id} className="detail-event">
             <div className="event-type-icon"><CalendarClock /></div>
-            <div className="detail-event-main"><div><strong>{event.title}</strong><span>{event.eventType}</span></div><p>{fullDateTime(event.startsAt)} · {event.duration} 分钟</p>{event.location && <p><MapPin />{event.location}</p>}
-              <div className="event-actions">{review ? <button onClick={() => onOpenReview(review)}><FileText />编辑复盘</button> : <button onClick={() => onCreateReview(application.id, event.id)}><Plus />新建复盘</button>}<button onClick={() => onEditEvent(event)}>编辑日程</button></div>
+            <div className="detail-event-main"><div><strong>{eventDisplayTitle(event, application)}</strong><span>{event.eventType}</span></div><p>{fullDateTime(event.startsAt)} · {event.duration} 分钟</p>{event.location && <p><MapPin />{event.location}</p>}
+              <div className="event-actions">{event.meetingUrl && <button className="primary-event-link" onClick={() => window.offerManager.openUrl(event.meetingUrl)}><ExternalLink />{eventLinkLabel(event.eventType)}</button>}{review ? <button onClick={() => onOpenReview(review)}><FileText />编辑复盘</button> : <button onClick={() => onCreateReview(application.id, event.id)}><Plus />新建复盘</button>}<button onClick={() => onEditEvent(event)}>编辑日程</button></div>
             </div>
           </article>
         })}</div> : <div className="mini-empty">尚未添加笔试或面试安排</div>}
@@ -388,19 +402,25 @@ function ApplicationModal({ value, stages, onClose, onSave }: { value?: Applicat
 }
 
 function EventModal({ applicationId, application, value, onClose, onSave }: { applicationId: string; application?: Application; value?: InterviewEvent; onClose: () => void; onSave: (input: EventInput) => void }) {
+  const defaultEventType = value?.eventType || '一面'
   const [form, setForm] = useState<EventInput>({
-    id: value?.id, applicationId, title: value?.title || `${application?.company || ''} 面试`, eventType: value?.eventType || '一面',
+    id: value?.id, applicationId, title: value ? eventDisplayTitle(value, application) : `${application?.company || ''} ${defaultEventType}`, eventType: defaultEventType,
     startsAt: value?.startsAt ? toInputDateTime(value.startsAt) : toInputDateTime(), duration: value?.duration || 60,
     location: value?.location || '', meetingUrl: value?.meetingUrl || '', contact: value?.contact || '', status: value?.status || '待进行', reminderMinutes: value?.reminderMinutes || 30,
   })
   const update = (key: keyof EventInput, next: string | number) => setForm(current => ({ ...current, [key]: next }))
-  return <Modal title={value ? '编辑日程' : '添加面试日程'} subtitle={`${application?.company || ''} · ${application?.role || ''}`} onClose={onClose}>
+  const updateEventType = (nextType: string) => setForm(current => {
+    const company = application?.company || ''
+    const usesAutomaticTitle = current.title.trim() === `${company} ${current.eventType}` || current.title.trim() === `${company} 面试` || current.title.trim() === '面试'
+    return { ...current, eventType: nextType, title: usesAutomaticTitle ? `${company} ${nextType}` : current.title }
+  })
+  return <Modal title={value ? '编辑日程' : '添加日程'} subtitle={`${application?.company || ''} · ${application?.role || ''}`} onClose={onClose}>
     <form onSubmit={event => { event.preventDefault(); onSave({ ...form, startsAt: new Date(form.startsAt).toISOString() }) }}>
       <Field label="日程名称" required><input required autoFocus value={form.title} onChange={e => update('title', e.target.value)} /></Field>
-      <div className="form-grid"><Field label="流程类型"><select value={form.eventType} onChange={e => update('eventType', e.target.value)}>{['在线测评', '笔试', 'AI面', '一面', '二面', '三面', 'HR面', '终面', '其他沟通'].map(item => <option key={item}>{item}</option>)}</select></Field><Field label="状态"><select value={form.status} onChange={e => update('status', e.target.value)}><option>待进行</option><option>已完成</option><option>已取消</option></select></Field></div>
+      <div className="form-grid"><Field label="流程类型"><select value={form.eventType} onChange={e => updateEventType(e.target.value)}>{['在线测评', '笔试', 'AI面', '一面', '二面', '三面', 'HR面', '终面', '其他沟通'].map(item => <option key={item}>{item}</option>)}</select></Field><Field label="状态"><select value={form.status} onChange={e => update('status', e.target.value)}><option>待进行</option><option>已完成</option><option>已取消</option></select></Field></div>
       <div className="form-grid"><Field label="开始时间"><input required type="datetime-local" value={form.startsAt} onChange={e => update('startsAt', e.target.value)} /></Field><Field label="预计时长（分钟）"><input min="10" type="number" value={form.duration} onChange={e => update('duration', Number(e.target.value))} /></Field></div>
       <Field label="地点或方式"><input value={form.location} onChange={e => update('location', e.target.value)} placeholder="线上 / 公司地址 / 腾讯会议" /></Field>
-      <Field label="会议链接"><input type="url" value={form.meetingUrl} onChange={e => update('meetingUrl', e.target.value)} placeholder="https://" /></Field>
+      <Field label="日程链接"><input type="url" value={form.meetingUrl} onChange={e => update('meetingUrl', e.target.value)} placeholder="填写本轮测评、笔试或视频面试链接" /></Field>
       <div className="form-grid"><Field label="联系人"><input value={form.contact} onChange={e => update('contact', e.target.value)} /></Field><Field label="提前提醒"><select value={form.reminderMinutes} onChange={e => update('reminderMinutes', Number(e.target.value))}><option value={15}>15 分钟</option><option value={30}>30 分钟</option><option value={60}>1 小时</option><option value={1440}>1 天</option></select></Field></div>
       <ModalFooter onClose={onClose} label="保存日程" />
     </form>
