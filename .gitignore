@@ -1,6 +1,5 @@
 node_modules/
 dist/
-release/
 release-update/
 *.log
 *.tsbuildinfo

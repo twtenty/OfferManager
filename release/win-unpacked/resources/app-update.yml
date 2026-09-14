@@ -1,0 +1,4 @@
+owner: twtenty
+repo: OfferManager
+provider: github
+updaterCacheDirName: offer-manager-updater
